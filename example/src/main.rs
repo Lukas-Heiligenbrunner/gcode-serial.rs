@@ -1,10 +1,3 @@
-# A Rust lib to send Gcode via UART to a 3D printer
-
-A stream based GCode sender.
-
-Sample Code:
-
-```rust
 use gcode_serial::printer_actions::PrinterActions;
 use gcode_serial::action::{Action, Command, TelemetryData};
 
@@ -67,5 +60,3 @@ fn main() {
         }
     })
 }
-
-```

@@ -1,0 +1,10 @@
+[package]
+name = "example"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+gcode-serial = {path = ".."}
+tokio = { version = "1", features = ["rt", "sync", "time", "rt-multi-thread"] }
