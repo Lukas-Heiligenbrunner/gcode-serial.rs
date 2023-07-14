@@ -1,5 +1,5 @@
 use gcode_serial::printer_actions::PrinterActions;
-use gcode_serial::action::{Action, Command, TelemetryData};
+use gcode_serial::action::{Action, Command, PrinterStatus, TelemetryData};
 
 use tokio::sync::broadcast;
 use tokio::runtime::Runtime;
@@ -22,7 +22,7 @@ fn main() {
         });
 
         // send print start command
-        tx.send(Action::Command(Command::StartPrint(filename)));
+        tx.send(Action::Command(Command::StartPrint(filename.to_string())));
 
         let mut rx = tx.subscribe();
         // monitor for receiving actions
@@ -52,7 +52,20 @@ fn main() {
                             _ => {}
                         }
                     }
-                    Action::StateChange(_) => {}
+                    Action::StateChange(s) => {
+                        match s {
+                            PrinterStatus::Disconnected => {}
+                            PrinterStatus::Active => {}
+                            PrinterStatus::Idle => {
+                                println!("print finished");
+                                break;
+                            }
+                            PrinterStatus::Errored => {
+                                println!("print errored");
+                                break;
+                            }
+                        }
+                    }
                     Action::PrinterAction(_) => {}
                     Action::Command(_) => {}
                 }
