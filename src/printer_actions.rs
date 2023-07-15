@@ -33,6 +33,7 @@ impl PrinterActions {
         }
     }
 
+    /// connect to printer and initialize lib
     pub async fn start(&mut self) {
         let mut rx = self.tx.subscribe();
 
@@ -77,6 +78,7 @@ impl PrinterActions {
         }
     }
 
+    /// set target temperatures of bed and extruder
     pub fn set_temps(&mut self, bed_temp: u16, extruder_temp: u16) {
         self.que
             .lock()
@@ -88,15 +90,9 @@ impl PrinterActions {
             .push_back(format!("M104 S{}", extruder_temp));
     }
 
+    /// start a new print of given gcode file path
+    /// won't start file if event que size > 10
     pub fn start_print(&self, file_name: String) {
-        // if !self.data.lock().unwrap().printer_connection_alive {
-        //     return Err("The printer might not be started or connected.".to_string());
-        // }
-
-        // if self.data.lock().unwrap().active_file.is_some() {
-        //     return Err("already started?".to_string());
-        // }
-
         // if we have a large que we don't do anything
         if self.que.lock().unwrap().len() > 10 {
             return;
@@ -146,10 +142,12 @@ impl PrinterActions {
                 }
             }
 
+            // if line starts with ; or is empty we skip it
             if command.trim().starts_with(";") || command.trim().is_empty() {
                 continue;
             }
 
+            // we remove comments and take the gcode cmd only
             if command.trim().contains(";") {
                 command = command.trim().split(";").collect::<Vec<&str>>()[0].to_string();
             }
@@ -166,6 +164,7 @@ impl PrinterActions {
         self.event.lock().unwrap().notify(42);
     }
 
+    /// stop the active print and add the stop gcode to que
     pub fn stop_print(&self) {
         let mut que = self.que.lock().unwrap();
         que.clear();

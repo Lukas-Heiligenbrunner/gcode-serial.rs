@@ -1,8 +1,10 @@
 pub mod action;
 pub mod file;
-mod pre_send_handler;
 pub mod printer_actions;
+pub mod temperature;
+
+mod pre_send_handler;
 mod response_handler;
 mod serial;
 mod temp_interval;
-pub mod temperature;
+
