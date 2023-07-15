@@ -6,6 +6,7 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::sync::broadcast::Sender;
+use std::time::Instant;
 
 pub struct Serial {
     port: Box<dyn SerialPort>,
@@ -141,11 +142,19 @@ impl Serial {
         let mut msgs: Vec<String> = Vec::new();
         let mut remainder = "".to_string();
 
+        let mut timestamp = Instant::now();
+
         loop {
             while self.port.bytes_to_read().map_err(|e1| e1.to_string())? == 0 {
+                if timestamp.elapsed().as_millis() > 5_000 {
+                    warn!("Receive loop did not receive any message for more than 5sec!");
+                    warn!("{:?}", msgs);
+                    return Err("No response received".to_string());
+                }
                 tokio::time::sleep(Duration::from_millis(5)).await;
             }
 
+            timestamp = Instant::now();
             let response = format!(
                 "{}{}",
                 remainder,

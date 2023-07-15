@@ -22,7 +22,7 @@ fn main() {
         });
 
         // send print start command
-        tx.send(Action::Command(Command::StartPrint(filename.to_string())));
+        let _ = tx.send(Action::Command(Command::StartPrint(filename.to_string())));
 
         let mut rx = tx.subscribe();
         // monitor for receiving actions
