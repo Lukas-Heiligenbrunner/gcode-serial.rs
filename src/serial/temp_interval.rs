@@ -1,5 +1,5 @@
-use crate::action::{Action, PrinterStatus};
-use crate::serial::Serial;
+use crate::models::action::{Action, PrinterStatus};
+use crate::serial::serial::Serial;
 use log::warn;
 use std::time::Duration;
 

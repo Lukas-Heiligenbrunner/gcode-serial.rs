@@ -1,6 +1,7 @@
-use crate::action::{Action, Command, PrinterAction, PrinterStatus, TelemetryData};
-use crate::file::{FilamentType, GcodeFile};
-use crate::serial::Serial;
+use crate::models::action::{Action, Command, PrinterAction, PrinterStatus, TelemetryData};
+use crate::models::file::{FilamentType, GcodeFile};
+use crate::models::serial_connector::SerialConnector;
+use crate::serial::serial::Serial;
 use event_listener::Event;
 use lazy_static::lazy_static;
 use log::debug;
@@ -34,14 +35,14 @@ impl PrinterActions {
     }
 
     /// connect to printer and initialize lib
-    pub async fn start(&mut self) {
+    pub async fn start(&mut self, serial_connector: SerialConnector) {
         let mut rx = self.tx.subscribe();
 
         let que = self.que.clone();
         let event = self.event.clone();
         let tx = self.tx.clone();
         tokio::spawn(async move {
-            let mut serial = Serial::new(tx, 115_200, que, event).await;
+            let mut serial = Serial::new(tx, serial_connector, que, event).await;
             serial.start_temp_interval();
             serial.start_event_loop().await;
         });

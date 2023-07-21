@@ -1,5 +1,5 @@
-use crate::file::GcodeFile;
-use crate::temperature::Temperature;
+use crate::models::file::GcodeFile;
+use crate::models::temperature::Temperature;
 use serde::{Deserialize, Serialize};
 use strum::Display;
 
@@ -63,7 +63,7 @@ pub enum TelemetryData {
 /// Send an Action command to the lib
 #[derive(Clone, Serialize, Deserialize)]
 pub enum Command {
-    /// Set target temps
+    /// Set target temps (bed, extruder)
     SetTemps(u16, u16),
     /// Start printing a file given by path
     StartPrint(String),

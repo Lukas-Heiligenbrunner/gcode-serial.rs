@@ -1,5 +1,5 @@
-use crate::action::TelemetryData;
-use crate::serial::Serial;
+use crate::models::action::TelemetryData;
+use crate::serial::serial::Serial;
 use lazy_static::lazy_static;
 use regex::Regex;
 

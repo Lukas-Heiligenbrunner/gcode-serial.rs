@@ -1,8 +1,9 @@
 use gcode_serial::printer_actions::PrinterActions;
-use gcode_serial::action::{Action, Command, PrinterStatus, TelemetryData};
+use gcode_serial::models::action::{Action, Command, PrinterStatus, TelemetryData};
 
 use tokio::sync::broadcast;
 use tokio::runtime::Runtime;
+use gcode_serial::models::serial_connector::SerialConnector;
 
 fn main() {
     // initialize Tokio runtime
@@ -18,7 +19,7 @@ fn main() {
             // create printer object
             let mut pa = PrinterActions::new(t);
             // start printer service
-            pa.start().await;
+            pa.start(SerialConnector::Auto).await;
         });
 
         // send print start command
