@@ -1,6 +1,7 @@
-use crate::action::{Action, Command, PrinterAction, PrinterStatus, TelemetryData};
-use crate::file::{FilamentType, GcodeFile};
-use crate::serial::Serial;
+use crate::models::action::{Action, Command, PrinterAction, PrinterStatus, TelemetryData};
+use crate::models::file::{FilamentType, GcodeFile};
+use crate::models::serial_connector::SerialConnector;
+use crate::serial::serial::Serial;
 use event_listener::Event;
 use lazy_static::lazy_static;
 use log::debug;
@@ -16,17 +17,17 @@ lazy_static! {
     static ref RE_MAX_Z_POS: Regex = Regex::new(r";\s*max_layer_z\s*=\s*([\d.]+)").unwrap();
 }
 
-pub struct PrinterActions {
+pub struct GcodeSerial {
     tx: Sender<Action>,
     que: Arc<Mutex<VecDeque<String>>>,
     event: Arc<Mutex<Event>>,
 }
 
-impl PrinterActions {
+impl GcodeSerial {
     pub fn new(tx: Sender<Action>) -> Self {
         let q = Arc::new(Mutex::new(VecDeque::new()));
         let event = Arc::new(Mutex::new(Event::new()));
-        PrinterActions {
+        GcodeSerial {
             tx: tx.clone(),
             que: q,
             event,
@@ -34,14 +35,14 @@ impl PrinterActions {
     }
 
     /// connect to printer and initialize lib
-    pub async fn start(&mut self) {
+    pub async fn start(&mut self, serial_connector: SerialConnector) {
         let mut rx = self.tx.subscribe();
 
         let que = self.que.clone();
         let event = self.event.clone();
         let tx = self.tx.clone();
         tokio::spawn(async move {
-            let mut serial = Serial::new(tx, 115_200, que, event).await;
+            let mut serial = Serial::new(tx, serial_connector, que, event).await;
             serial.start_temp_interval();
             serial.start_event_loop().await;
         });

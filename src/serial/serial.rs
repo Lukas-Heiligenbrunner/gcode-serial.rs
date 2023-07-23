@@ -1,12 +1,14 @@
-use crate::action::{Action, PrinterStatus, TelemetryData};
+use crate::models::action::{Action, PrinterStatus, TelemetryData};
+use crate::models::serial_connector::SerialConnector;
+
 use event_listener::Event;
 use log::{debug, error, info, warn};
 use serialport::{ClearBuffer, SerialPort};
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tokio::sync::broadcast::Sender;
 use std::time::Instant;
+use tokio::sync::broadcast::Sender;
 
 pub struct Serial {
     port: Box<dyn SerialPort>,
@@ -19,29 +21,36 @@ pub struct Serial {
 impl Serial {
     pub async fn new(
         tx: Sender<Action>,
-        boud_rate: u32,
+        serial_connector: SerialConnector,
         qq: Arc<Mutex<VecDeque<String>>>,
         event: Arc<Mutex<Event>>,
     ) -> Self {
-        let ports = loop {
-            let ports = serialport::available_ports().unwrap_or(Vec::new());
-            debug!("Number of ports: {}", ports.len());
-            for p in &ports {
-                debug!("PORT: {}", p.port_name);
-            }
+        let (name, boud) = match serial_connector {
+            SerialConnector::Auto => {
+                let ports = loop {
+                    let ports = serialport::available_ports().unwrap_or(Vec::new());
+                    debug!("Number of ports: {}", ports.len());
+                    for p in &ports {
+                        debug!("PORT: {}", p.port_name);
+                    }
 
-            if ports.len() != 0 {
-                break ports;
-            } else {
-                warn!("No Serial port found, retrying in 5secs!");
-                tokio::time::sleep(Duration::from_secs(5)).await;
+                    if ports.len() != 0 {
+                        break ports;
+                    } else {
+                        warn!("No Serial port found, retrying in 5secs!");
+                        tokio::time::sleep(Duration::from_secs(5)).await;
+                    }
+                };
+
+                let pname = &ports[0].port_name;
+                let name = pname.split("/").last().unwrap();
+
+                (format!("/dev/{}", name), 115_200)
             }
+            SerialConnector::Manual(serial_port, boud) => (serial_port, boud),
         };
 
-        let pname = &ports[0].port_name;
-        let name = pname.split("/").last().unwrap();
-
-        let mut p = serialport::new(format!("/dev/{}", name), boud_rate)
+        let mut p = serialport::new(name, boud)
             .timeout(Duration::from_millis(10000))
             .open()
             .expect("cannot open port");
