@@ -2,7 +2,7 @@
 A stream based GCode sender.
 The api is still in progress and subject to change.
 
-## Sample Code:
+## Quick start Code:
 
 
 ```rust
@@ -25,9 +25,9 @@ fn main() {
         let t = tx.clone();
         tokio::spawn(async move {
             // create printer object
-            let mut pa = GcodeSerial::new(t);
+            let mut gs = GcodeSerial::new(t);
             // start printer service
-            pa.start(SerialConnector::Auto).await;
+            gs.start(SerialConnector::Auto).await;
         });
 
         // send print start command
@@ -71,6 +71,30 @@ fn main() {
 }
 
 ```
+
+## Usage
+
+### GcodeSerial object
+At first you need to create an instance of `GcodeSerial` for each printer you want to connect with
+`let mut gs = GcodeSerial::new(t)`
+where t is a broadcast channel needed to cummunicate with the lib. 
+
+Afterwards you can connect to the printer with `gs.start(SerialConnector::Auto).await;`.
+You might wanna call this in a seperate (soft)-thread because this call is blocking.
+
+### SerialConnector
+You can choose if the serial port should be found automatically with `SerialConnector::Auto` or manually with 
+`SerialConnector::Manual("/dev/ttyUSB0", 115_200)`
+
+### Receiving/Sending data from/to the printer
+Attach to the broadcast stream and receive with the Enum the data you need. See example above. 
+
+| Enum Field               | Function                | Example                                        | Trigger      |
+|--------------------------|-------------------------|------------------------------------------------|--------------|
+| Action::Telemetry(t)     | receive telemetry       | temperature, progress, target temps, fan speed | value change |
+| Action::StateChange(t)   | printer state change    | Disconnected,Active,Idle,Errored,              | value change |
+| Action::PrinterAction(t) | printer sent action cmd | cancel/pause/resume print                      | printer      |
+| Action::Command(t)       | send actions to the lib | start/cancel print, Set Temperatures           | lib user     |
 
 ## License
 

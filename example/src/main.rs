@@ -19,7 +19,7 @@ fn main() {
             // create printer object
             let mut pa = GcodeSerial::new(t);
             // start printer service
-            pa.start(SerialConnector::Auto).await;
+            pa.start(SerialConnector::Manual()).await;
         });
 
         // send print start command
