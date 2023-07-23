@@ -1,4 +1,4 @@
 pub mod models;
-pub mod printer_actions;
+pub mod gcode_serial;
 
 mod serial;

@@ -6,8 +6,9 @@ The api is still in progress and subject to change.
 
 
 ```rust
-use gcode_serial::printer_actions::PrinterActions;
-use gcode_serial::action::{Action, Command, TelemetryData};
+use gcode_serial::gcode_serial::GcodeSerial;
+use gcode_serial::models::action::{Action, Command, PrinterStatus, TelemetryData};
+use gcode_serial::models::serial_connector::SerialConnector;
 
 use tokio::sync::broadcast;
 use tokio::runtime::Runtime;
@@ -24,9 +25,9 @@ fn main() {
         let t = tx.clone();
         tokio::spawn(async move {
             // create printer object
-            let mut pa = PrinterActions::new(t);
+            let mut pa = GcodeSerial::new(t);
             // start printer service
-            pa.start().await;
+            pa.start(SerialConnector::Auto).await;
         });
 
         // send print start command

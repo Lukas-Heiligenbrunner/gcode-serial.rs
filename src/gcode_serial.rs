@@ -17,17 +17,17 @@ lazy_static! {
     static ref RE_MAX_Z_POS: Regex = Regex::new(r";\s*max_layer_z\s*=\s*([\d.]+)").unwrap();
 }
 
-pub struct PrinterActions {
+pub struct GcodeSerial {
     tx: Sender<Action>,
     que: Arc<Mutex<VecDeque<String>>>,
     event: Arc<Mutex<Event>>,
 }
 
-impl PrinterActions {
+impl GcodeSerial {
     pub fn new(tx: Sender<Action>) -> Self {
         let q = Arc::new(Mutex::new(VecDeque::new()));
         let event = Arc::new(Mutex::new(Event::new()));
-        PrinterActions {
+        GcodeSerial {
             tx: tx.clone(),
             que: q,
             event,
