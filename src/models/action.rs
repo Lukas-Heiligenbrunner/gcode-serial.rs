@@ -1,4 +1,4 @@
-use crate::models::file::GcodeFile;
+use crate::models::file::{FinishedPrint, GcodeFile};
 use crate::models::temperature::Temperature;
 use serde::{Deserialize, Serialize};
 use strum::Display;
@@ -54,10 +54,10 @@ pub enum TelemetryData {
     MaxZHeight(f32),
     /// Fan speed changed
     FanSpeed(f32),
-    /// Active print file changed
-    ActiveFile(Option<GcodeFile>),
-    /// Last print file changed
-    LastFileActive(GcodeFile),
+    /// Active print file changed either file or none
+    ActiveFileChange(Option<GcodeFile>),
+    /// Finished print event
+    PrintFinished(FinishedPrint),
 }
 
 /// Send an Action command to the lib

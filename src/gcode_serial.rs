@@ -1,5 +1,5 @@
 use crate::models::action::{Action, Command, PrinterAction, PrinterStatus, TelemetryData};
-use crate::models::file::{FilamentType, GcodeFile};
+use crate::models::file::{FinishedPrint, GcodeFile};
 use crate::models::serial_connector::SerialConnector;
 use crate::serial::serial::Serial;
 use event_listener::Event;
@@ -10,7 +10,7 @@ use std::collections::VecDeque;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::sync::{Arc, Mutex};
-use std::time::UNIX_EPOCH;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::broadcast::Sender;
 
 lazy_static! {
@@ -21,6 +21,7 @@ pub struct GcodeSerial {
     tx: Sender<Action>,
     que: Arc<Mutex<VecDeque<String>>>,
     event: Arc<Mutex<Event>>,
+    active_file: Option<GcodeFile>,
 }
 
 impl GcodeSerial {
@@ -31,6 +32,7 @@ impl GcodeSerial {
             tx: tx.clone(),
             que: q,
             event,
+            active_file: None,
         }
     }
 
@@ -51,6 +53,30 @@ impl GcodeSerial {
             match v {
                 Action::Telemetry(_) => {}
                 Action::StateChange(s) => {
+                    match s {
+                        PrinterStatus::Disconnected => {}
+                        PrinterStatus::Active => {}
+                        PrinterStatus::Idle => {
+                            if self.active_file.is_some() {
+                                let f = self.active_file.clone().unwrap();
+
+                                let _ = self.tx.send(Action::Telemetry(
+                                    TelemetryData::PrintFinished(FinishedPrint {
+                                        name: f.name,
+                                        size: f.size,
+                                        last_modified: f.last_modified,
+                                        start_time: f.start_time,
+                                        finish_time: SystemTime::now()
+                                            .duration_since(UNIX_EPOCH)
+                                            .unwrap()
+                                            .as_millis(),
+                                    }),
+                                ));
+                                self.active_file = None;
+                            }
+                        }
+                        PrinterStatus::Errored => {}
+                    }
                     debug!("Printer State change: {}", s);
                 }
                 Action::PrinterAction(a) => match a {
@@ -93,13 +119,13 @@ impl GcodeSerial {
 
     /// start a new print of given gcode file path
     /// won't start file if event que size > 10
-    pub fn start_print(&self, file_name: String) {
+    pub fn start_print(&mut self, file_path: String) {
         // if we have a large que we don't do anything
         if self.que.lock().unwrap().len() > 10 {
             return;
         }
 
-        let file = File::open(format!("models/{}", file_name)).unwrap();
+        let file = File::open(file_path.to_string()).unwrap();
 
         let unix_timestamp = file
             .metadata()
@@ -113,17 +139,22 @@ impl GcodeSerial {
 
         let reader = BufReader::new(file);
 
-        // self.data.lock().unwrap().print_job_active = true;
-        // todo
-        let active_file = Some(GcodeFile {
-            name: file_name,
+        let active_file = GcodeFile {
+            name: file_path,
             size,
             last_modified: unix_timestamp,
-            filament_type: FilamentType::PLA, // todo get correct type here
-        });
+            start_time: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis(),
+        };
+        self.active_file = Some(active_file.clone());
+
         let _ = self
             .tx
-            .send(Action::Telemetry(TelemetryData::ActiveFile(active_file)));
+            .send(Action::Telemetry(TelemetryData::ActiveFileChange(Some(
+                active_file,
+            ))));
 
         for line in reader.lines() {
             let mut command = line.unwrap();
