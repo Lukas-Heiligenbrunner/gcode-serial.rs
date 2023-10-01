@@ -19,7 +19,7 @@ fn main() {
             // create printer object
             let mut pa = GcodeSerial::new(t);
             // start printer service
-            pa.start(SerialConnector::Manual()).await;
+            pa.start(SerialConnector::Auto).await;
         });
 
         // send print start command
@@ -47,7 +47,7 @@ fn main() {
                             TelemetryData::TotalCommandCount(n) => {
                                 println!("Number of total commands to send: {}", n);
                             }
-                            TelemetryData::ActiveFile(f) => {
+                            TelemetryData::ActiveFileChange(f) => {
                                 println!("Current file changed: {}", f.unwrap().name);
                             }
                             _ => {}
