@@ -114,7 +114,7 @@ dependencies = [
 
 [[package]]
 name = "gcode-serial"
-version = "0.1.2"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "event-listener",
