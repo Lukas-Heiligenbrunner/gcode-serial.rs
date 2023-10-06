@@ -4,14 +4,14 @@ use crate::models::serial_connector::SerialConnector;
 use crate::serial::serial::Serial;
 use event_listener::Event;
 use lazy_static::lazy_static;
-use log::debug;
+use log::{debug, warn};
 use regex::Regex;
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tokio::sync::broadcast::Sender;
+use tokio::sync::broadcast::{Receiver, Sender};
 
 lazy_static! {
     static ref RE_MAX_Z_POS: Regex = Regex::new(r";\s*max_layer_z\s*=\s*([\d.]+)").unwrap();
@@ -38,7 +38,7 @@ impl GcodeSerial {
 
     /// connect to printer and initialize lib
     pub async fn start(&mut self, serial_connector: SerialConnector) {
-        let mut rx = self.tx.subscribe();
+        let rx = self.tx.subscribe();
 
         let que = self.que.clone();
         let event = self.event.clone();
@@ -49,6 +49,88 @@ impl GcodeSerial {
             serial.start_event_loop().await;
         });
 
+        self.handle_action_commands(rx).await;
+    }
+
+    /// set target temperatures of bed and extruder
+    pub fn set_temps(&mut self, bed_temp: u16, extruder_temp: u16) {
+        self.que
+            .lock()
+            .unwrap()
+            .push_back(format!("M140 S{}", bed_temp));
+        self.que
+            .lock()
+            .unwrap()
+            .push_back(format!("M104 S{}", extruder_temp));
+    }
+
+    /// start a new print of given gcode file path
+    /// won't start file if event que size > 10
+    pub fn start_print(&mut self, file_path: String) {
+        // if we have a large que we don't do anything
+        let que_len = self.que.lock().unwrap().len();
+        if que_len > 10 {
+            warn!(
+                "Failed to start new print. Que has still {} elements",
+                que_len
+            );
+            return;
+        }
+
+        let file = File::open(file_path.to_string()).unwrap();
+
+        let unix_timestamp = file
+            .metadata()
+            .unwrap()
+            .modified()
+            .unwrap()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_millis();
+        let size = file.metadata().unwrap().len();
+
+        let reader = BufReader::new(file);
+
+        let active_file = GcodeFile {
+            name: file_path,
+            size,
+            last_modified: unix_timestamp,
+            start_time: SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_millis(),
+        };
+        self.active_file = Some(active_file.clone());
+
+        let _ = self
+            .tx
+            .send(Action::Telemetry(TelemetryData::ActiveFileChange(Some(
+                active_file,
+            ))));
+
+        self.load_file_to_que(reader);
+
+        let _ = self
+            .tx
+            .send(Action::Telemetry(TelemetryData::TotalCommandCount(
+                self.que.lock().unwrap().len() as u32,
+            )));
+        let _ = self.tx.send(Action::StateChange(PrinterStatus::Active));
+        self.event.lock().unwrap().notify(42);
+    }
+
+    /// stop the active print and add the stop gcode to que
+    pub fn stop_print(&self) {
+        self.clear_que_add_ending_code();
+
+        let _ = self
+            .tx
+            .send(Action::Telemetry(TelemetryData::TotalCommandCount(0)));
+        let _ = self.tx.send(Action::StateChange(PrinterStatus::Idle));
+        self.event.lock().unwrap().notify(42);
+    }
+
+    async fn handle_action_commands(&mut self, mut rx: Receiver<Action>) {
         while let Ok(v) = rx.recv().await {
             match v {
                 Action::Telemetry(_) => {}
@@ -105,57 +187,7 @@ impl GcodeSerial {
         }
     }
 
-    /// set target temperatures of bed and extruder
-    pub fn set_temps(&mut self, bed_temp: u16, extruder_temp: u16) {
-        self.que
-            .lock()
-            .unwrap()
-            .push_back(format!("M140 S{}", bed_temp));
-        self.que
-            .lock()
-            .unwrap()
-            .push_back(format!("M104 S{}", extruder_temp));
-    }
-
-    /// start a new print of given gcode file path
-    /// won't start file if event que size > 10
-    pub fn start_print(&mut self, file_path: String) {
-        // if we have a large que we don't do anything
-        if self.que.lock().unwrap().len() > 10 {
-            return;
-        }
-
-        let file = File::open(file_path.to_string()).unwrap();
-
-        let unix_timestamp = file
-            .metadata()
-            .unwrap()
-            .modified()
-            .unwrap()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_millis();
-        let size = file.metadata().unwrap().len();
-
-        let reader = BufReader::new(file);
-
-        let active_file = GcodeFile {
-            name: file_path,
-            size,
-            last_modified: unix_timestamp,
-            start_time: SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .unwrap()
-                .as_millis(),
-        };
-        self.active_file = Some(active_file.clone());
-
-        let _ = self
-            .tx
-            .send(Action::Telemetry(TelemetryData::ActiveFileChange(Some(
-                active_file,
-            ))));
-
+    fn load_file_to_que(&self, reader: BufReader<File>) {
         for line in reader.lines() {
             let mut command = line.unwrap();
 
@@ -186,18 +218,9 @@ impl GcodeSerial {
 
             self.que.lock().unwrap().push_back(command);
         }
-
-        let _ = self
-            .tx
-            .send(Action::Telemetry(TelemetryData::TotalCommandCount(
-                self.que.lock().unwrap().len() as u32,
-            )));
-        let _ = self.tx.send(Action::StateChange(PrinterStatus::Active));
-        self.event.lock().unwrap().notify(42);
     }
 
-    /// stop the active print and add the stop gcode to que
-    pub fn stop_print(&self) {
+    fn clear_que_add_ending_code(&self) {
         let mut que = self.que.lock().unwrap();
         que.clear();
         // run end procedure gcodes
@@ -210,10 +233,5 @@ impl GcodeSerial {
         que.push_back("M107".to_string()); // turn off fan
         que.push_back("M84".to_string()); // disable motors
                                           // que.push_back("M603".to_string()); // prusa specific gcode-endprint
-        let _ = self
-            .tx
-            .send(Action::Telemetry(TelemetryData::TotalCommandCount(0)));
-        let _ = self.tx.send(Action::StateChange(PrinterStatus::Idle));
-        self.event.lock().unwrap().notify(42);
     }
 }
