@@ -11,7 +11,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
-use tokio::sync::broadcast::{Sender, Receiver};
+use tokio::sync::broadcast::{Receiver, Sender};
 
 lazy_static! {
     static ref RE_MAX_Z_POS: Regex = Regex::new(r";\s*max_layer_z\s*=\s*([\d.]+)").unwrap();
@@ -70,7 +70,10 @@ impl GcodeSerial {
         // if we have a large que we don't do anything
         let que_len = self.que.lock().unwrap().len();
         if que_len > 10 {
-            warn!("Failed to start new print. Que has still {} elements", que_len);
+            warn!(
+                "Failed to start new print. Que has still {} elements",
+                que_len
+            );
             return;
         }
 
@@ -229,6 +232,6 @@ impl GcodeSerial {
         que.push_back("M140 S0".to_string()); // turn off heatbed
         que.push_back("M107".to_string()); // turn off fan
         que.push_back("M84".to_string()); // disable motors
-        // que.push_back("M603".to_string()); // prusa specific gcode-endprint
+                                          // que.push_back("M603".to_string()); // prusa specific gcode-endprint
     }
 }
