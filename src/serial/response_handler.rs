@@ -1,6 +1,6 @@
 use crate::models::action::{Action, PrinterAction, PrinterStatus, TelemetryData};
 use crate::models::temperature::Temperature;
-use crate::serial::serial::Serial;
+use crate::serial::event_loop::Serial;
 use lazy_static::lazy_static;
 use log::warn;
 use regex::Regex;

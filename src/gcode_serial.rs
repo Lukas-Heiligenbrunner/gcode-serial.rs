@@ -1,7 +1,7 @@
 use crate::models::action::{Action, Command, PrinterAction, PrinterStatus, TelemetryData};
 use crate::models::file::{FinishedPrint, GcodeFile};
 use crate::models::serial_connector::SerialConnector;
-use crate::serial::serial::Serial;
+use crate::serial::event_loop::Serial;
 use event_listener::Event;
 use lazy_static::lazy_static;
 use log::{debug, warn};
@@ -77,7 +77,7 @@ impl GcodeSerial {
             return;
         }
 
-        let file = File::open(file_path.to_string()).unwrap();
+        let file = File::open(&file_path).unwrap();
 
         let unix_timestamp = file
             .metadata()
@@ -207,13 +207,13 @@ impl GcodeSerial {
             }
 
             // if line starts with ; or is empty we skip it
-            if command.trim().starts_with(";") || command.trim().is_empty() {
+            if command.trim().starts_with(';') || command.trim().is_empty() {
                 continue;
             }
 
             // we remove comments and take the gcode cmd only
-            if command.trim().contains(";") {
-                command = command.trim().split(";").collect::<Vec<&str>>()[0].to_string();
+            if command.trim().contains(';') {
+                command = command.trim().split(';').collect::<Vec<&str>>()[0].to_string();
             }
 
             self.que.lock().unwrap().push_back(command);
