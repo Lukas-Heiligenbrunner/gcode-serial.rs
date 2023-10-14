@@ -28,7 +28,7 @@ impl Serial {
         let (name, boud) = match serial_connector {
             SerialConnector::Auto => {
                 let ports = loop {
-                    let ports = serialport::available_ports().unwrap_or(Vec::new());
+                    let ports = serialport::available_ports().unwrap_or_default();
                     debug!("Number of ports: {}", ports.len());
                     for p in &ports {
                         debug!("PORT: {}", p.port_name);
