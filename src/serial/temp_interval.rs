@@ -1,5 +1,5 @@
 use crate::models::action::{Action, PrinterStatus};
-use crate::serial::serial::Serial;
+use crate::serial::event_loop::Serial;
 use log::warn;
 use std::time::Duration;
 
@@ -31,17 +31,15 @@ impl Serial {
 
                     alive_counter = 0;
                     que.lock().unwrap().push_front("M105".to_string());
-                } else {
-                    if alive_counter >= 4 {
-                        warn!("There seems to be no connection to printer");
-                        // this might be also triggered when a print is started at the heating process await
-                        if *printerstatus.lock().unwrap() != PrinterStatus::Disconnected {
-                            *printerstatus.lock().unwrap() = PrinterStatus::Disconnected;
-                            let _ = tx.send(Action::StateChange(PrinterStatus::Disconnected));
-                        }
-                    } else {
-                        alive_counter += 1;
+                } else if alive_counter >= 4 {
+                    warn!("There seems to be no connection to printer");
+                    // this might be also triggered when a print is started at the heating process await
+                    if *printerstatus.lock().unwrap() != PrinterStatus::Disconnected {
+                        *printerstatus.lock().unwrap() = PrinterStatus::Disconnected;
+                        let _ = tx.send(Action::StateChange(PrinterStatus::Disconnected));
                     }
+                } else {
+                    alive_counter += 1;
                 }
                 event.lock().unwrap().notify(42);
             }

@@ -28,13 +28,13 @@ impl Serial {
         let (name, boud) = match serial_connector {
             SerialConnector::Auto => {
                 let ports = loop {
-                    let ports = serialport::available_ports().unwrap_or(Vec::new());
+                    let ports = serialport::available_ports().unwrap_or_default();
                     debug!("Number of ports: {}", ports.len());
                     for p in &ports {
                         debug!("PORT: {}", p.port_name);
                     }
 
-                    if ports.len() != 0 {
+                    if !ports.is_empty() {
                         break ports;
                     } else {
                         warn!("No Serial port found, retrying in 5secs!");
@@ -43,7 +43,7 @@ impl Serial {
                 };
 
                 let pname = &ports[0].port_name;
-                let name = pname.split("/").last().unwrap();
+                let name = pname.split('/').last().unwrap();
 
                 (format!("/dev/{}", name), 115_200)
             }
@@ -55,7 +55,7 @@ impl Serial {
             .open()
             .expect("cannot open port");
 
-        p.write("\r\n\r\n".as_bytes())
+        p.write_all("\r\n\r\n".as_bytes())
             .expect("failed to write init");
         p.flush().expect("failed to flush");
 
@@ -171,9 +171,9 @@ impl Serial {
             );
             remainder = "".to_string();
 
-            let mut lines: Vec<&str> = response.split("\n").collect();
+            let mut lines: Vec<&str> = response.split('\n').collect();
 
-            if !response.ends_with("\n") {
+            if !response.ends_with('\n') {
                 remainder = lines.pop().unwrap_or("").to_string();
             }
 
